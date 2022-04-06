@@ -1,5 +1,7 @@
 # UE5Coro
 
+**Temporary fork of https://github.com/landelare/ue5coro as it is crashing MSVC 17.1.3 (VS2022). Current workaround is to use templates instead of autos.**
+
 This library implements C++20
 [coroutine](https://en.cppreference.com/w/cpp/language/coroutines) support for
 Unreal Engine 5. It complements the engine's (as of 5.0) experimental coroutine
