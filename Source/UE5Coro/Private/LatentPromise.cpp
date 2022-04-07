@@ -83,6 +83,16 @@ public:
 			                     LatentInfo.CallbackTarget);
 	}
 
+	virtual void NotifyActionAborted() override
+	{
+		checkf(IsInGameThread(),
+			   TEXT("Unexpected latent action off the game thread"));
+
+		auto& Promise = Handle.promise();
+		auto& OnAborted = Promise.GetOnAborted();
+		OnAborted.ExecuteIfBound();
+	}
+
 	const FLatentActionInfo& GetLatentInfo() const { return LatentInfo; }
 
 	void SetCurrentAwaiter(FLatentAwaiter* Awaiter)

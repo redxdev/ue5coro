@@ -35,6 +35,7 @@
 #include <atomic>
 #include <coroutine>
 #include "Engine/LatentActionManager.h"
+#include "LatentYield.h"
 #include "AsyncCoroutine.generated.h"
 
 namespace UE5Coro::Private
@@ -100,7 +101,7 @@ public:
 	FAsyncCoroutine get_return_object() { return {}; }
 	void unhandled_exception() { check(!"Exceptions are not supported"); }
 
-	// co_yield is not allowed in async coroutines
+	// co_yield isn't allowed in async coroutines
 	std::suspend_never yield_value(auto&&) = delete;
 };
 
@@ -129,6 +130,8 @@ private:
 	void* PendingLatentCoroutine = nullptr;
 	std::atomic<ELatentState> LatentState = LatentRunning;
 
+	FLatentCoroutineAbortedDelegate OnAborted;
+
 	void CreateLatentAction(FLatentActionInfo&&);
 	void Init();
 	
@@ -154,6 +157,9 @@ public:
 	FInitialSuspend initial_suspend();
 	std::suspend_always final_suspend() noexcept { return {}; }
 	void return_void();
+
+	FLatentCoroutineAbortedDelegate& GetOnAborted() { return OnAborted; }
+	std::suspend_never yield_value(const FLatentCoroutineAbortedDelegate& InDelegate) { OnAborted = InDelegate; return {}; }
 };
 
 template<typename... TArgs>
