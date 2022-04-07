@@ -90,7 +90,17 @@ public:
 
 		auto& Promise = Handle.promise();
 		auto& OnAborted = Promise.GetOnAborted();
-		OnAborted.ExecuteIfBound();
+		OnAborted.ExecuteIfBound(false);
+	}
+
+	virtual void NotifyObjectDestroyed() override
+	{
+		checkf(IsInGameThread(),
+			   TEXT("Unexpected latent action off the game thread"));
+
+		auto& Promise = Handle.promise();
+		auto& OnAborted = Promise.GetOnAborted();
+		OnAborted.ExecuteIfBound(true);
 	}
 
 	const FLatentActionInfo& GetLatentInfo() const { return LatentInfo; }

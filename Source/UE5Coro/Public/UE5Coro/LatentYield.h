@@ -35,7 +35,7 @@
 
 namespace UE5Coro::Private
 {
-	DECLARE_DELEGATE(FLatentCoroutineAbortedDelegate);
+	DECLARE_DELEGATE_OneParam(FLatentCoroutineAbortedDelegate, bool bWasObjectDestroyed);
 }
 
 namespace UE5Coro::Latent
@@ -51,6 +51,6 @@ namespace UE5Coro::Latent
 	inline UE_NODISCARD Private::FLatentCoroutineAbortedDelegate NotifyOnAbort(bool& InFlag)
 	{
 		InFlag = false;
-		return Private::FLatentCoroutineAbortedDelegate::CreateLambda([&InFlag]() { InFlag = true; });
+		return Private::FLatentCoroutineAbortedDelegate::CreateLambda([&InFlag](bool) { InFlag = true; });
 	}
 }
