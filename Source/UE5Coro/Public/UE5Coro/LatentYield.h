@@ -47,10 +47,4 @@ namespace UE5Coro::Latent
 	{
 		return Private::FLatentCoroutineAbortedDelegate::CreateLambda<FunctorType, VarTypes...>(Forward<FunctorType>(InFunctor), Vars...);
 	}
-
-	inline UE_NODISCARD Private::FLatentCoroutineAbortedDelegate NotifyOnAbort(bool& InFlag)
-	{
-		InFlag = false;
-		return Private::FLatentCoroutineAbortedDelegate::CreateLambda([&InFlag](bool) { InFlag = true; });
-	}
 }
