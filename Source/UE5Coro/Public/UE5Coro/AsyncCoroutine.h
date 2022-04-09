@@ -35,11 +35,11 @@
 #include <atomic>
 #include <coroutine>
 #include "Engine/LatentActionManager.h"
-#include "LatentYield.h"
 #include "AsyncCoroutine.generated.h"
 
 namespace UE5Coro::Private
 {
+enum class ELatentFlags : uint8;
 class FAsyncPromise;
 class FLatentAwaiter;
 class FLatentPromise;
@@ -84,7 +84,7 @@ struct FInitialSuspend
 
 	bool await_ready() noexcept { return Action == Ready; }
 	void await_resume() noexcept { }
-	void await_suspend(std::coroutine_handle<> Handle) noexcept
+	void await_suspend(std::coroutine_handle<FLatentPromise> Handle) noexcept
 	{
 		if (Action == Destroy)
 			Handle.destroy();
@@ -101,7 +101,7 @@ public:
 	FAsyncCoroutine get_return_object() { return {}; }
 	void unhandled_exception() { check(!"Exceptions are not supported"); }
 
-	// co_yield isn't allowed in async coroutines
+	// co_yield is not allowed in async coroutines
 	std::suspend_never yield_value(auto&&) = delete;
 };
 
@@ -121,7 +121,7 @@ public:
 		LatentRunning,
 		AsyncRunning,
 		DeferredDestroy,
-		Aborted,
+		Canceled,
 		Done,
 	};
 
@@ -129,39 +129,35 @@ private:
 	UWorld* World = nullptr;
 	void* PendingLatentCoroutine = nullptr;
 	std::atomic<ELatentState> LatentState = LatentRunning;
-
-	FLatentCoroutineAbortedDelegate OnAborted;
+	ELatentFlags LatentFlags = static_cast<ELatentFlags>(0);
 
 	void CreateLatentAction(FLatentActionInfo&&);
 	void Init();
-	
+
 	template<typename... TArgs>
 	void Init(const UObject*, TArgs&...);
 	
 	template<typename... TArgs>
-	void Init(const UObject& WorldContext, TArgs&... Args);
-	
-	template<typename... TArgs>
 	void Init(FLatentActionInfo, TArgs&...);
 	
-	template<typename TFirstArg, typename... TArgs, typename = typename TEnableIf<!std::is_base_of_v<UObject, TFirstArg>>::Type>
+	template<typename TFirstArg, typename... TArgs>
 	void Init(TFirstArg&, TArgs&...);
 
 public:
 	template<typename... TArgs>
 	explicit FLatentPromise(TArgs&&...);
 
+	void Resume();
+	void Destroy();
+
 	std::atomic<ELatentState>& GetMutableLatentState() { return LatentState; }
+	ELatentFlags& GetMutableLatentFlags() { return LatentFlags; }
 	void SetCurrentAwaiter(FLatentAwaiter*);
 
 	FInitialSuspend initial_suspend();
 	std::suspend_always final_suspend() noexcept { return {}; }
 	void return_void();
-
-	FLatentCoroutineAbortedDelegate& GetOnAborted() { return OnAborted; }
-	std::suspend_never yield_value(const FLatentCoroutineAbortedDelegate& InDelegate) { OnAborted = InDelegate; return {}; }
 };
-
 template<typename... TArgs>
 FLatentPromise::FLatentPromise(TArgs&&... Args)
 {
@@ -182,17 +178,6 @@ void FLatentPromise::Init(const UObject* WorldContext, TArgs&... Args)
 }
 
 template<typename... TArgs>
-void FLatentPromise::Init(const UObject& WorldContext, TArgs&... Args)
-{
-	// *this will be passed as an argument to the coroutine constructor when called from a member function.
-	// This allows a cleaner way of grabbing the world from member functions, since those generally don't have a world context argument.
-	if (!World)
-		World = WorldContext.GetWorld(); // null is fine
-
-	Init(Args...);
-}
-
-template<typename... TArgs>
 void FLatentPromise::Init(FLatentActionInfo LatentInfo, TArgs&... Args)
 {
 	// The static_assert on coroutine_traits prevents this
@@ -202,9 +187,13 @@ void FLatentPromise::Init(FLatentActionInfo LatentInfo, TArgs&... Args)
 	Init(Args...);
 }
 
-template<typename TFirstArg, typename... TArgs, typename>
-void FLatentPromise::Init(TFirstArg&, TArgs&... Args)
+template<typename TFirstArg, typename... TArgs>
+void FLatentPromise::Init(TFirstArg& First, TArgs&... Args)
 {
-	Init(Args...);
+	// Convert UObject& to UObject* for world context
+	if constexpr (std::is_convertible_v<TFirstArg, const UObject&>)
+		Init(static_cast<const UObject*>(std::addressof(First)), Args...);
+	else
+		Init(Args...);
 }
 }

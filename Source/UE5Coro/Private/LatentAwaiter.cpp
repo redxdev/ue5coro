@@ -29,6 +29,7 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "Globals.h"
 #include "LatentActions.h"
 #include "UE5Coro/AsyncCoroutine.h"
 #include "UE5Coro/LatentAwaiters.h"
@@ -40,10 +41,10 @@ namespace
 {
 struct [[nodiscard]] FPendingAsyncCoroutine : FPendingLatentAction
 {
-	std::coroutine_handle<> Handle;
+	std::coroutine_handle<FAsyncPromise> Handle;
 	FLatentAwaiter* Awaiter;
 
-	FPendingAsyncCoroutine(std::coroutine_handle<> Handle,
+	FPendingAsyncCoroutine(std::coroutine_handle<FAsyncPromise> Handle,
 	                       FLatentAwaiter* Awaiter)
 		: Handle(Handle), Awaiter(Awaiter) { }
 
@@ -73,6 +74,10 @@ struct [[nodiscard]] FPendingAsyncCoroutine : FPendingLatentAction
 void FLatentCancellation::await_suspend(
 	std::coroutine_handle<FLatentPromise> Handle)
 {
+#if DO_CHECK
+	GIsInLatentCoroutine = false;
+#endif
+
 	ensureMsgf(IsInGameThread(),
 	           TEXT("Latent awaiters may only be used on the game thread"));
 	auto& Promise = Handle.promise();
@@ -82,7 +87,7 @@ void FLatentCancellation::await_suspend(
 		ensureMsgf(CurrentState == FLatentPromise::LatentRunning,
 		           TEXT("Unexpected state in latent coroutine %d"), CurrentState);
 	);
-	LatentState = FLatentPromise::Aborted;
+	LatentState = FLatentPromise::Canceled;
 }
 
 FLatentAwaiter::~FLatentAwaiter()
@@ -107,6 +112,10 @@ void FLatentAwaiter::await_suspend(std::coroutine_handle<FAsyncPromise> Handle)
 
 void FLatentAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> Handle)
 {
+#if DO_CHECK
+	GIsInLatentCoroutine = false;
+#endif
+
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
 	auto& Promise = Handle.promise();

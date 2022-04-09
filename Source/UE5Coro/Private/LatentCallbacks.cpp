@@ -1,4 +1,4 @@
-﻿// Copyright © Laura Andelare
+// Copyright © Laura Andelare
 // All rights reserved.
 // 
 // Redistribution and use in source and binary forms, with or without
@@ -29,22 +29,51 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
+#include "UE5Coro/LatentCallbacks.h"
+#include "Globals.h"
 
-#include "CoreMinimal.h"
+using namespace UE5Coro::Latent;
+using namespace UE5Coro::Private;
 
-namespace UE5Coro::Private
+FOnActionAborted::FOnActionAborted(TFunction<void()> Callback)
+	: Callback(std::move(Callback))
 {
-	DECLARE_DELEGATE_OneParam(FLatentCoroutineAbortedDelegate, bool bWasObjectDestroyed);
+	// This can happen on any thread
+	checkf(GIsInLatentCoroutine, TEXT("Coroutine is not latent"));
 }
 
-namespace UE5Coro::Latent
+FOnActionAborted::~FOnActionAborted()
 {
-	// co_yield on any of these functions to set a function to run when the latent action is cancelled (*not* when it finishes normally).
-	// Only a single abort callback can be set.
-	template<typename FunctorType, typename... VarTypes>
-	UE_NODISCARD Private::FLatentCoroutineAbortedDelegate OnAbort(FunctorType&& InFunctor, VarTypes... Vars)
-	{
-		return Private::FLatentCoroutineAbortedDelegate::CreateLambda<FunctorType, VarTypes...>(Forward<FunctorType>(InFunctor), Vars...);
-	}
+	// This can happen on any thread while the game thread might be deleting
+	if (GLatentFlags & ELatentFlags::ActionAborted && IsInGameThread())
+		Callback();
+}
+
+FOnObjectDestroyed::FOnObjectDestroyed(TFunction<void()> Callback)
+	: Callback(std::move(Callback))
+{
+	// This can happen on any thread
+	checkf(GIsInLatentCoroutine, TEXT("Coroutine is not latent"));
+}
+
+FOnObjectDestroyed::~FOnObjectDestroyed()
+{
+	// This can happen on any thread while the game thread might be deleting
+	if (GLatentFlags & ELatentFlags::ObjectDestroyed && IsInGameThread())
+		Callback();
+}
+
+FOnActionAbortedOrDestroyed::FOnActionAbortedOrDestroyed(TFunction<void()> Callback)
+	: Callback(std::move(Callback))
+{
+	// This can happen on any thread
+	checkf(GIsInLatentCoroutine, TEXT("Coroutine is not latent"));
+}
+
+FOnActionAbortedOrDestroyed::~FOnActionAbortedOrDestroyed()
+{
+	// This can happen on any thread while the game thread might be deleting
+	if ((GLatentFlags & ELatentFlags::ObjectDestroyed ||
+		GLatentFlags & ELatentFlags::ActionAborted) && IsInGameThread())
+		Callback();
 }
