@@ -1,6 +1,6 @@
 # UE5Coro
 
-**Temporary fork of https://github.com/landelare/ue5coro as it is crashing MSVC 17.1.3 (VS2022). Current workaround is to use templates instead of autos. [This](https://developercommunity.visualstudio.com/t/fatal-error-c1001-internal-compiler-error-compiler-9/1669485) issue on the VS dev community seems to be the same problem.**
+**As of the latest version of MSVC and the latest commit of https://github.com/landelare/ue5coro this repository is no longer necessary.**
 
 This library implements C++20
 [coroutine](https://en.cppreference.com/w/cpp/language/coroutines) support for
